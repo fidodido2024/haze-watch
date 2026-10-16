@@ -1,0 +1,6 @@
+{
+  "name": "SingaRate - Singapore MAS FX & Exchange Rates",
+  "description": "Real-time Singapore Dollar (SGD) currency conversion and exchange rates tool with MAS market quotation standards and search.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
