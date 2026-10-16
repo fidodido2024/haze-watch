@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, KeyRound, Check, Copy, ExternalLink, RefreshCw, Terminal, ShieldCheck, Database } from 'lucide-react';
 import { MasApiConfig } from '../types/currency';
-import { getBackendIntegrationCodeSample, MAS_DATASTORE_RESOURCE_ID } from '../services/masExchangeApi';
+import { getBackendIntegrationCodeSample, MAS_GATEWAY_ENDPOINT } from '../services/masExchangeApi';
 
 interface MasApiModalProps {
   isOpen: boolean;
@@ -276,8 +276,10 @@ export const MasApiModal: React.FC<MasApiModalProps> = ({
               </pre>
 
               <div className="text-xs text-slate-500 space-y-1">
-                <p><strong>Resource ID:</strong> <code className="bg-slate-100 px-1 rounded">{MAS_DATASTORE_RESOURCE_ID}</code></p>
-                <p>This queries the official MAS End of Day Exchange Rates datastore search API.</p>
+                <p><strong>Serverless Endpoint:</strong> <code className="bg-slate-100 px-1 rounded">/api/exchangerates</code></p>
+                <p><strong>Health Check Route:</strong> <code className="bg-slate-100 px-1 rounded">/api/health</code></p>
+                <p><strong>Upstream MAS Gateway:</strong> <code className="bg-slate-100 px-1 rounded text-[10px] break-all">https://eservices.mas.gov.sg/apimg-gw/server/monthly_statistical_bulletin_non610ora/exchange_rates_end_of_period_daily/views/exchange_rates_end_of_period_daily</code></p>
+                <p><strong>Authentication:</strong> Header <code className="bg-slate-100 px-1 rounded">KeyId: &lt;MAS_KEY_ID&gt;</code></p>
               </div>
             </div>
           )}

@@ -5,13 +5,14 @@ const STORAGE_KEY = 'singarate_mas_config_v1';
 
 export const DEFAULT_MAS_CONFIG: MasApiConfig = {
   apiKey: '',
-  endpointUrl: 'https://eservices.mas.gov.sg/api/action/datastore/search.json',
+  endpointUrl: '/api/exchangerates',
   mode: 'simulated',
   lastUpdated: new Date().toISOString(),
   autoRefreshInterval: 60, // seconds
 };
 
-export const MAS_DATASTORE_RESOURCE_ID = '95932927-c4bc-4753-accc-99e9d3ac96bb';
+export const MAS_GATEWAY_ENDPOINT =
+  'https://eservices.mas.gov.sg/apimg-gw/server/monthly_statistical_bulletin_non610ora/exchange_rates_end_of_period_daily/views/exchange_rates_end_of_period_daily';
 
 export function getStoredMasConfig(): MasApiConfig {
   try {
@@ -34,43 +35,34 @@ export function saveStoredMasConfig(config: MasApiConfig): void {
 }
 
 /**
- * Generates an example backend integration template code snippet
- * so the user can easily copy and paste into their backend proxy (Express, Cloud Function, etc.)
+ * Generates backend integration documentation
  */
-export function getBackendIntegrationCodeSample(apiKey: string = 'YOUR_MAS_API_KEY'): string {
-  return `// Backend proxy example (e.g. server.ts or /api/exchange-rates.ts)
-// The Monetary Authority of Singapore (MAS) Exchange Rates API:
-import express from 'express';
+export function getBackendIntegrationCodeSample(apiKey: string = 'YOUR_MAS_KEY_ID'): string {
+  return `// Serverless / Express MAS Exchange Rate Gateway
+// Endpoint: ${MAS_GATEWAY_ENDPOINT}?end_of_day=2026-10-14
+// Header: KeyId: <MAS_KEY_ID>
 
-const app = express();
-const MAS_API_KEY = process.env.MAS_API_KEY || '${apiKey || 'YOUR_MAS_API_KEY'}';
-const MAS_RESOURCE_ID = '95932927-c4bc-4753-accc-99e9d3ac96bb';
+import fetch from 'node-fetch';
 
-app.get('/api/mas-exchange-rates', async (req, res) => {
-  try {
-    const url = new URL('https://eservices.mas.gov.sg/api/action/datastore/search.json');
-    url.searchParams.set('resource_id', MAS_RESOURCE_ID);
-    url.searchParams.set('limit', '1');
-    url.searchParams.set('sort', 'end_of_day desc');
+export async function fetchLiveMasRates(date: string = '2026-10-14') {
+  const masKeyId = process.env.MAS_KEY_ID || '${apiKey || 'YOUR_MAS_KEY_ID'}';
+  const url = new URL('${MAS_GATEWAY_ENDPOINT}');
+  url.searchParams.set('end_of_day', date);
 
-    const headers: Record<string, string> = {
-      'Accept': 'application/json'
-    };
-    if (MAS_API_KEY) {
-      headers['x-api-key'] = MAS_API_KEY;
-    }
+  const response = await fetch(url.toString(), {
+    headers: {
+      'Accept': 'application/json',
+      'KeyId': masKeyId,
+      'User-Agent': 'MoneyXhange-MAS-Gateway/1.0',
+    },
+  });
 
-    const response = await fetch(url.toString(), { headers });
-    if (!response.ok) {
-      throw new Error(\`MAS API error: \${response.statusText}\`);
-    }
-
-    const data = await response.json();
-    res.json(data);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  if (!response.ok) {
+    throw new Error(\`MAS Gateway error: \${response.statusText}\`);
   }
-});
+
+  return await response.json();
+}
 `;
 }
 
@@ -83,33 +75,33 @@ export async function fetchExchangeRates(config: MasApiConfig): Promise<{
   source: 'mas_live' | 'backend_proxy' | 'simulated_fixing';
   rawRecord?: Record<string, any>;
 }> {
-  // If user configured a custom proxy endpoint and mode is 'live'
-  if (config.mode === 'live' && config.endpointUrl) {
+  // If user configured a custom proxy endpoint or local /api/exchangerates
+  if (config.mode === 'live' || config.endpointUrl === '/api/exchangerates') {
     try {
       const headers: Record<string, string> = {
         'Accept': 'application/json',
       };
       if (config.apiKey) {
+        headers['KeyId'] = config.apiKey;
         headers['x-api-key'] = config.apiKey;
       }
 
       const res = await fetch(config.endpointUrl, { headers });
       if (res.ok) {
         const data = await res.json();
-        const records = data?.result?.records || data?.records;
-        if (records && records.length > 0) {
-          const latestRecord = records[0];
-          const mapped = mapMasRecordToCurrencies(latestRecord, INITIAL_CURRENCIES);
+        const rawRates = data?.rates || data?.result?.records?.[0] || data?.records?.[0] || data?.rawMasData;
+        if (rawRates) {
+          const mapped = mapMasRecordToCurrencies(rawRates, INITIAL_CURRENCIES);
           return {
             currencies: mapped,
-            lastUpdated: latestRecord.end_of_day || new Date().toISOString(),
-            source: 'mas_live',
-            rawRecord: latestRecord
+            lastUpdated: rawRates.end_of_day || new Date().toISOString(),
+            source: data.mode === 'live_mas_gateway' ? 'mas_live' : 'backend_proxy',
+            rawRecord: rawRates,
           };
         }
       }
     } catch (err) {
-      console.warn('Could not reach custom MAS backend endpoint, falling back to simulated benchmark rates:', err);
+      console.warn('Could not reach backend /api/exchangerates endpoint, falling back to simulated benchmark rates:', err);
     }
   }
 
